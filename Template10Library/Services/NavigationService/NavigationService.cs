@@ -10,6 +10,7 @@ using Windows.UI.Core;
 using Windows.UI.ViewManagement;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
+using Windows.UI.Xaml.Media.Animation;
 using Windows.UI.Xaml.Navigation;
 
 namespace Template10.Services.NavigationService
@@ -24,7 +25,7 @@ namespace Template10.Services.NavigationService
         object LastNavigationParameter { get; set; }
         string LastNavigationType { get; set; }
 
-        public NavigationService(Frame frame)
+        internal NavigationService(Frame frame)
         {
             FrameFacade = new FrameFacade(frame);
             FrameFacade.Navigating += async (s, e) =>
@@ -97,6 +98,14 @@ namespace Template10.Services.NavigationService
             var page = FrameFacade.Content as Page;
             if (page != null)
             {
+                if (page.DataContext == null)
+                {
+                    // to support dependency injection, but keeping it optional.
+                    var viewmodel = BootStrapper.Current.ResolveForPage(page.GetType(), this);
+                    if (viewmodel != null)
+                        page.DataContext = viewmodel;
+                }
+
                 // call viewmodel
                 var dataContext = page.DataContext as INavigable;
                 if (dataContext != null)
@@ -186,18 +195,21 @@ namespace Template10.Services.NavigationService
             //return view.Id;
         }
 
-        public bool Navigate(Type page, object parameter = null)
+        public bool Navigate(Type page, object parameter = null, NavigationTransitionInfo infoOverride = null)
         {
             if (page == null)
                 throw new ArgumentNullException(nameof(page));
             if (page.FullName.Equals(LastNavigationType)
                 && parameter == LastNavigationParameter)
                 return false;
-            return FrameFacade.Navigate(page, parameter);
+            return FrameFacade.Navigate(page, parameter, infoOverride);
         }
 
         public void SaveNavigation()
         {
+            if (CurrentPageType == null)
+                return;
+
             var state = FrameFacade.PageStateContainer(GetType());
             if (state == null)
             {
